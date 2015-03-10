@@ -35,14 +35,14 @@ function getTable($header, $data, $id)
 	$html = '<table border="1">
 				<tr>';
 	foreach ($header as $h)
-		$html .= '<td>'.$h.'</td>';
+		$html .= '<td>'.Tools::safeOutput($h).'</td>';
 	$html .= '</tr>';
 	foreach ($data as $d)
 	{
 		$html .= '<tr>';
 		foreach ($d as $dd)
-			$html .= '<td>'.$dd.'</td>';
-		$html .= '<td><a href="config.php?type=addto'.$id.'&id'.$id.'='.$d['id_'.$id.'condition'].'">Add</a></td>';
+			$html .= '<td>'.Tools::safeOutput($dd).'</td>';
+		$html .= '<td><a href="config.php?type=addto'.Tools::safeOutput($id).'&id'.Tools::safeOutput($id).'='.Tools::safeOutput($d['id_'.$id.'condition']).'">Add</a></td>';
 		$html .= '</tr>';
 	}
 	return $html;
@@ -53,14 +53,14 @@ function getAdd($input, $type, $hidden = false)
 	$html = '<fieldset>
 		<legend>Add One</legend>
 		<form action=# method="post">
-		<input type="hidden" name="type" value="'.$type.'" />';
+		<input type="hidden" name="type" value="'.Tools::safeOutput($type).'" />';
 		if ($hidden)
 			foreach ($hidden as $key => $value)
-				$html .= '<input type="hidden" name="'.$key.'" value="'.$value.'" />';
+				$html .= '<input type="hidden" name="'.Tools::safeOutput($key).'" value="'.Tools::safeOutput($value).'" />';
 	$html .= '<table>';
 
 	foreach ($input as $i)
-		$html .= '<tr><td>'.$i.'</td><td><textarea name="'.$i.'" ></textarea></td></tr>';
+		$html .= '<tr><td>'.Tools::safeOutput($i).'</td><td><textarea name="'.Tools::safeOutput($i).'" ></textarea></td></tr>';
 
 	$html .= '	</table>
 				<input type="submit" value="ok" />
@@ -78,13 +78,13 @@ if (Tools::getValue('type') == 'baseadd')
 elseif (Tools::getValue('type') == 'sourceadd')
 {
 	Db::getInstance()->Execute('INSERT INTO '._DB_PREFIX_.'sourcecondition(id_basecondition,label, jointable)
-		values ('.pSQL(Tools::getValue('idbase')).',"'.pSQL(Tools::getValue('label')).'", "'.pSQL(Tools::getValue('jointable')).'")');
+		values ("'.pSQL(Tools::getValue('idbase')).'","'.pSQL(Tools::getValue('label')).'", "'.pSQL(Tools::getValue('jointable')).'")');
 	Tools::redirect('modules/segmentmodule/config.php?type=addtobase&idbase='.(int)Tools::getValue('idbase'));
 }
 elseif (Tools::getValue('type') == 'fieldadd')
 {
 	Db::getInstance()->Execute('INSERT INTO '._DB_PREFIX_.'fieldcondition(id_sourcecondition,label, field)
-		values ('.pSQL(Tools::getValue('idsource')).',"'.pSQL(Tools::getValue('label')).'", "'.pSQL(Tools::getValue('field')).'")');
+		values ("'.pSQL(Tools::getValue('idsource')).'","'.pSQL(Tools::getValue('label')).'", "'.pSQL(Tools::getValue('field')).'")');
 	Tools::redirect('modules/segmentmodule/config.php?type=addtosource&idsource='.(int)Tools::getValue('idsource'));
 }
 elseif (Tools::getValue('type') == 'addtosource')

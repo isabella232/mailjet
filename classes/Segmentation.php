@@ -158,14 +158,14 @@ class Segmentation
 	public function getSourceSelect($ID, $inputID, $selected = null)
 	{
 		$res = Db::getInstance()->executeS('SELECT id_sourcecondition, label FROM `'._DB_PREFIX_.'mj_sourcecondition` WHERE `id_basecondition` = '.(int)$ID);
-		$html = '<select id="sourceSelect'.$inputID.'" name="sourceSelect[]" class="sourceSelect fixed">';
+		$html = '<select id="sourceSelect'.Tools::safeOutput($inputID).'" name="sourceSelect[]" class="sourceSelect fixed">';
 		$html .= '<option value="-1">--SELECT--</option>';
 		foreach ($res as $r)
 		{
-			$html .= '<option value="'.$r['id_sourcecondition'].'"';
+			$html .= '<option value="'.Tools::safeOutput($r['id_sourcecondition']).'"';
 			if ($selected == $r['id_sourcecondition'])
 				$html .= 'selected=selected';
-			$html .= ' >'.$this->ll($r['label']).'</option>';
+			$html .= ' >'.Tools::safeOutput($this->ll($r['label'])).'</option>';
 		}
 		$html .= '</select>';
 		return $html;
@@ -174,14 +174,14 @@ class Segmentation
 	public function getIndicSelect($ID, $inputID, $selected = null)
 	{
 		$res = Db::getInstance()->ExecuteS('SELECT id_fieldcondition, label FROM `'._DB_PREFIX_.'mj_fieldcondition` WHERE `id_sourcecondition` = '.(int)$ID);
-		$html = '<select name="fieldSelect[]" class="fieldSelect fixed" id="fieldSelect'.$inputID.'">';
+		$html = '<select name="fieldSelect[]" class="fieldSelect fixed" id="fieldSelect'.Tools::safeOutput($inputID).'">';
 		$html .= '<option value="-1">--SELECT--</option>';
 		foreach ($res as $r)
 		{
-			$html .= '<option value="'.$r['id_fieldcondition'].'"';
+			$html .= '<option value="'.Tools::safeOutput($r['id_fieldcondition']).'"';
 			if ($selected == $r['id_fieldcondition'])
 				$html .= 'selected=selected';
-			$html .= ' >'.$this->ll($r['label']).'</option>';
+			$html .= ' >'.Tools::safeOutput($this->ll($r['label'])).'</option>';
 		}
 		$html .= '</select>';
 		return $html;
@@ -361,12 +361,16 @@ class Segmentation
 						switch ($data)
 						{
 							case '1': // Taxes included
-								$labels[] = '(SELECT FORMAT((SUM(wo1.total_paid_real)/cu.conversion_rate), 2) FROM '._DB_PREFIX_.'orders wo1 WHERE wo1.valid = 1 AND wo1.id_customer = o.id_customer) AS "'.$this->ll(55).'"';
+								$labels[] = '(SELECT FORMAT((SUM(wo1.total_paid_real)/cu.conversion_rate), 2)
+								    FROM '._DB_PREFIX_.'orders wo1 WHERE wo1.valid = 1 AND wo1.id_customer = o.id_customer)
+								    AS "'.pSQL($this->ll(55)).'"';
 								$sub_having_amount = 'o'.$i.'.total_paid_real';
 								break;
 							case '2': // Taxes excluded
 							default:
-								$labels[] = '(SELECT FORMAT((SUM(wo2.total_products)/cu.conversion_rate), 2) FROM '._DB_PREFIX_.'orders wo2 WHERE wo2.valid = 1 AND wo2.id_customer = o.id_customer) AS "'.$this->ll(56).'"';
+								$labels[] = '(SELECT FORMAT((SUM(wo2.total_products)/cu.conversion_rate), 2)
+								    FROM '._DB_PREFIX_.'orders wo2 WHERE wo2.valid = 1 AND wo2.id_customer = o.id_customer)
+								    AS "'.pSQL($this->ll(56)).'"';
 								$sub_having_amount = 'o'.$i.'.total_products';
 						}
 						$sub_groupby = 'c'.$i.'.id_customer';
@@ -384,12 +388,16 @@ class Segmentation
 						switch ($data)
 						{
 							case '1': // Taxes included
-								$labels[] = '(SELECT FORMAT((AVG(wo3.total_paid_real)/cu.conversion_rate), 2) FROM '._DB_PREFIX_.'orders wo3 WHERE wo3.valid = 1 AND wo3.id_customer = o.id_customer) AS "'.$this->ll(57).'"';
+								$labels[] = '(SELECT FORMAT((AVG(wo3.total_paid_real)/cu.conversion_rate), 2)
+								    FROM '._DB_PREFIX_.'orders wo3 WHERE wo3.valid = 1 AND wo3.id_customer = o.id_customer)
+								    AS "'.pSQL($this->ll(57)).'"';
 								$sub_having_amount = 'o'.$i.'.total_paid_real';
 								break;
 							case '2': // Taxes excluded
 							default:
-								$labels[] = '(SELECT FORMAT((AVG(wo4.total_products)/cu.conversion_rate), 2) FROM '._DB_PREFIX_.'orders wo4 WHERE wo4.valid = 1 AND wo4.id_customer = o.id_customer) AS "'.$this->ll(58).'"';
+								$labels[] = '(SELECT FORMAT((AVG(wo4.total_products)/cu.conversion_rate), 2)
+								    FROM '._DB_PREFIX_.'orders wo4 WHERE wo4.valid = 1 AND wo4.id_customer = o.id_customer)
+								    AS "'.pSQL($this->ll(58)).'"';
 								$sub_having_amount = 'o'.$i.'.total_products';
 						}
 						$sub_groupby = 'c'.$i.'.id_customer';
@@ -965,7 +973,7 @@ class Segmentation
 
 	public function displayRuleError($id, $error) /* alias */
 	{
-		die('<p class="noResult">'.$this->trad[81].' '.$id.' : '.$error.'</p>');
+		die('<p class="noResult">'.Tools::safeOutput($this->trad[81]).' '.Tools::safeOutput($id).' : '.Tools::safeOutput($error).'</p>');
 	}
 
 	public function getName($idfield, $id)
@@ -1215,7 +1223,7 @@ class Segmentation
 			$id_lang = $this->getCurrentIdLang();
 
 		if (file_exists($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'))
-			$this->trad = unserialize(Tools::file_get_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'));
+			$this->trad = json_decode(Tools::file_get_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'));
 		else
 		{
 			$this->cacheLang();
@@ -1236,7 +1244,7 @@ class Segmentation
 					fwrite($fp, $trad."\r\n");
 				fclose($fp);
 			}
-			file_put_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt', serialize($this->trad));
+			file_put_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt', json_encode($this->trad));
 		}
 	}
 
