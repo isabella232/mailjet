@@ -65,7 +65,7 @@ class Segmentation
         Context::getContext()->controller->addCss($this->local_path.'/css/bundlejs_prestashop.css');
         Context::getContext()->controller->addCss($this->local_path.'/css/bo.css');
         
-        Context::getContext()->controller->addJs($this->local_path.'/js/fonction.js');             
+        Context::getContext()->controller->addJs($this->local_path.'/js/functions.js');
         Context::getContext()->controller->addJs($this->local_path.'/js/main.js');             
         Context::getContext()->controller->addJs($this->local_path.'/js/bundlejs_prestashop.js');             
 
@@ -99,9 +99,9 @@ class Segmentation
 			'mj_PS_JS_DIR_' => _PS_JS_DIR_,
 			'mj_MODULE_DIR_' => _MODULE_DIR_,
 			'mj_hint_fieldset' => array(
-				$this->l('This module enable you to create segments of customer according to any criteria you think of. You can then either display and export the selected customers or associate them to an existing customer group.', 'mailjet'),
-				$this->l('These segments are particularly useful to create special offer associated with customer groups (e.g., send a coupon to the customers interested in some products)', 'mailjet'),
-				$this->l('Create an infinity of filters corresponding to your needs!', 'mailjet')),
+                $this->l('This module enables you to create segments of customers according to any criteria you think of. You can then either display and export the selected customers or associate them to an existing customer group.', 'mailjet'),
+                $this->l('These segments are particularly useful to create special offers associated with customer groups (e.g., send a coupon to the customers interested in some products)', 'mailjet'),
+                $this->l('Create an infinite number of filters corresponding to your needs!', 'mailjet')),
 			'mj_datePickerJsFormat' => Context::getContext()->cookie->id_lang == Language::getIdByIso('fr') ? 'dd-mm-yy' : 'yy-mm-dd',
 			'mj_datepickerPersonnalized' => version_compare(_PS_VERSION_, '1.5', '<') ? '<script type="text/javascript" src="'._PS_JS_DIR_.'jquery/datepicker/jquery-ui-personalized-1.6rc4.packed.js"></script>' : '',
 			'mj_token' => Tools::getValue('token'),
