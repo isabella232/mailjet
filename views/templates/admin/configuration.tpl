@@ -55,7 +55,7 @@
 		{l s='Errors list:' mod='mailjet'}
 		<ul class="mj_errors">
 			{foreach from=$MJ_errors item=current_error}
-				<li>{$current_error|escape|default:''}</li>
+				<li>{$current_error|default:''}</li>
 			{/foreach}
 		</ul>
 	</div>
@@ -64,11 +64,11 @@
 {include file="$MJ_local_path/views/templates/admin/$MJ_template_name.tpl"}
 
 {if !$is_landing}
-<div class="mj_landing">
+    <div class="mj_landing">
         <div align="center">
             <br />
             <a href="https://www.mailjet.com/support"
                target="_blank">{l s='If you have a question or if you have a problem, click here to contact support.' mod='mailjet'}</a>
+        </div>
     </div>
-</div>
 {/if}
