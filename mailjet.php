@@ -729,8 +729,20 @@ class Mailjet extends Module
 		// All emails sending by Mailjet ?
 		if (Tools::isSubmit('MJ_set_allemails'))
 		{
-			if (Tools::getValue('MJ_allemails_active')) $this->activateAllEmailMailjet();
-			else Configuration::updateValue('PS_MAIL_METHOD', 1);
+            $triggers = ($triggers = json_decode(Configuration::get('MJ_TRIGGERS'), 1)) ? $triggers : $this->triggers;
+            Configuration::updateValue('MJ_TRIGGERS', json_encode($triggers));
+                
+			if (Tools::getValue('MJ_allemails_active')) {
+                $this->activateAllEmailMailjet();
+                $triggers['active'] = 1;
+                
+            } else {
+                Configuration::updateValue('PS_MAIL_METHOD', 1);
+                /*
+                 * deactivate triggers if Mailjet emails are disabled
+                 */
+                $triggers['active'] = 0;
+            }
 
 			Configuration::updateValue('MJ_ALLEMAILS', Tools::getValue('MJ_allemails_active'));
 			$this->context->smarty->assign(array(
@@ -796,15 +808,15 @@ class Mailjet extends Module
 			$this->triggers['active'] = Tools::getValue('MJ_triggers_active');
 			for ($sel = 1; $sel <= 9; $sel++) {
 				$this->triggers['trigger'][$sel]['active'] = Tools::getValue('MJ_triggers_trigger_'.$sel.'_active');
-				if ($sel != 5 && $sel != 6){
+				if ($sel != 5 && $sel != 6) {
 					$this->triggers['trigger'][$sel]['period'] = (float)Tools::getValue('MJ_triggers_trigger_'.$sel.'_period');
 					$this->triggers['trigger'][$sel]['periodType'] = (int)Tools::getValue('MJ_triggers_trigger_'.$sel.'_periodType');
-				}else{
+				} else {
 					$this->triggers['trigger'][$sel]['discount'] = (float)Tools::getValue('MJ_triggers_trigger_'.$sel.'_discount');
 					$this->triggers['trigger'][$sel]['discountType'] = (int)Tools::getValue('MJ_triggers_trigger_'.$sel.'_discountType');
 				}
 				$languages = Language::getLanguages();
-				foreach ($languages as $l){
+				foreach ($languages as $l) {
 					$this->triggers['trigger'][$sel]['subject'][$l['id_lang']] = Tools::getValue('MJ_triggers_trigger_'.$sel.'_subject_'.$l['id_lang']);
 					$this->triggers['trigger'][$sel]['mail'][$l['id_lang']] = Tools::getValue('MJ_triggers_trigger_'.$sel.'_mail_'.$l['id_lang']);
 				}
@@ -1045,16 +1057,11 @@ class Mailjet extends Module
 		{
 			if (empty($c['stats_campaign_id']) || empty($c['delivered']))
 			{
-				$params = array(
-						'NewsLetter'	=> $c['campaign_id'],
-				);
-			
 				$api->resetRequest();
-				$api->campaignstatistics($params);
+				$api->campaignstatistics(array('NewsLetter' => $c['campaign_id']));
 				$mjc = $api->getResponse();
 
-				if (isset($mjc->Data) && isset($mjc->Data[0]))
-				{	
+				if (isset($mjc->Data) && isset($mjc->Data[0])) {
 					$campaigns[$key]['delivered'] = (int)$mjc->Data[0]->ProcessedCount;
 					$campaigns[$key]['title'] = $mjc->Data[0]->CampaignSubject;
 		
@@ -1067,29 +1074,27 @@ class Mailjet extends Module
 				}
 			}
 
-			// Allons chercher le ROI de cette campagne
 			$sql = 'SELECT COUNT(id_order) AS nb, SUM(total_paid) AS total
               FROM '._DB_PREFIX_.'mj_roi WHERE campaign_id = '.(int)$c['campaign_id'];
 			$totaux = Db::getInstance()->GetRow($sql);
 
-			if (!empty($totaux['total']))
-			{
-				$campaigns[$key]['perc_roi'] = (int)$totaux['nb'] * 100 / (int)$campaigns[$key]['delivered'];
-				$campaigns[$key]['total_roi'] = $totaux['total'];
-			}
-			else
-			{
-				$campaigns[$key]['perc_roi'] = 0;
-				$campaigns[$key]['total_roi'] = 0;
+			if(empty($totaux['total'])) {
+                $campaigns[$key]['num_sales_roi'] = 0;
+                $campaigns[$key]['perc_roi'] = 0;
+                $campaigns[$key]['total_roi'] = 0;
+			} else {
+                $campaigns[$key]['num_sales_roi'] = $totaux['nb'];
+                $campaigns[$key]['perc_roi'] = round((int)$totaux['nb'] * 100 / (int)$campaigns[$key]['delivered'],2);
+                $campaigns[$key]['total_roi'] = $totaux['total'];
 			}
 		}
 
-		// Assign
 		$this->context->smarty->assign(array(
 			'trad_title' => $this->l('Title'),
 			'trad_sentemails' => $this->l('Sent emails'),
 			'trad_roiamount' => $this->l('ROI Amount'),
-			'trad_roipercent' => $this->l('ROI percent'),
+			'trad_roipercent' => $this->l('ROI Percent'),
+			'trad_roi_num_sales' => $this->l('Number of sales'),
 			'campaigns' => $campaigns
 		));
 	}
@@ -1101,9 +1106,8 @@ class Mailjet extends Module
 		$sign = $this->context->currency->getSign();
 		$languages = Language::getLanguages();
 		$sel_lang = $this->context->language->id;
-
-        $cron = Tools::getShopDomainSsl(true)._MODULE_DIR_.$this->name.'/mailjet.cron.php?token='.$this->account->TOKEN;
-
+        $cron = Tools::getShopDomainSsl(true)._MODULE_DIR_.$this->name.'/mailjet.cron.php?token='.
+            Configuration::get('SEGMENT_CUSTOMER_TOKEN');
 		$iso = $this->context->language->iso_code;
 
 		// Assign
@@ -1123,10 +1127,13 @@ class Mailjet extends Module
 		));
 	}
 
-	private function updateTriggers()
+		
+    private function updateTriggers()
 	{
 		$triggers = $this->triggers;
+
 		$languages = Language::getLanguages();
+
 		for ($i = 1; $i <= 9; $i++)
 			foreach ($languages as $l)
 			$triggers['trigger'][$i]['mail'][$l['id_lang']] = rawurlencode($triggers['trigger'][$i]['mail'][$l['id_lang']]);
@@ -1134,10 +1141,13 @@ class Mailjet extends Module
 		return Configuration::updateValue('MJ_TRIGGERS', json_encode($triggers));
 	}
 
+    
 	private function initTriggers()
 	{
 		$this->triggers = ($triggers = json_decode(Configuration::get('MJ_TRIGGERS'), 1)) ? $triggers : $this->triggers;
+
 		$languages = Language::getLanguages();
+
 		for ($i = 1; $i <= 9; $i++) {
 			foreach ($languages as $l) {
 				if(!empty($this->triggers['trigger'][$i]['mail'][$l['id_lang']])){
@@ -1148,12 +1158,13 @@ class Mailjet extends Module
 		}
 	}
 
+
 	public function getTriggers()
 	{
 		return $this->triggers;
 	}
 
-	public function createTriggers()
+    public function createTriggers()
 	{
 		$subject = array();
 		$mail = array();
@@ -1163,15 +1174,15 @@ class Mailjet extends Module
 		$shop_name = $this->context->shop->name;
 		$shop_url = 'http://'.$this->context->shop->domain;
 
-		for ($i = 1; $i <= 9; $i++){
-			if ($i != 5 && $i != 6){
+		for ($i = 1; $i <= 9; $i++) {
+			if ($i != 5 && $i != 6) {
 				$this->triggers['trigger'][$i]['period'] = 0;
 				$this->triggers['trigger'][$i]['periodType'] = 1;
-			}else{
+			} 	else {
 				$this->triggers['trigger'][$i]['discount'] = 0;
 				$this->triggers['trigger'][$i]['discountType'] = 1;
 			}
-			foreach ($languages as $l){
+			foreach ($languages as $l) {
 				$this->triggers['trigger'][$i]['subject'][$l['id_lang']] = 'New message to {firstname} {lastname} !';
 				if (isset($subject[$i]['en'])) $this->triggers['trigger'][$i]['subject'][$l['id_lang']] = utf8_decode($subject[$i]['en']);
 				if (isset($subject[$i][$l['iso_code']])) $this->triggers['trigger'][$i]['subject'][$l['id_lang']] = utf8_decode($subject[$i][$l['iso_code']]);
@@ -1280,8 +1291,8 @@ class Mailjet extends Module
 		$test = new Mailjet_ApiOverlay($apiKey, $secretKey);
 		$result = $test->getUser();
 
-		if ($result !== false)
-		{
+		if ($result !== false) {
+            
 			$this->account->API_KEY = $apiKey;
 			$this->account->SECRET_KEY = $secretKey;
 			$this->account->EMAIL = $result->Email;
@@ -1301,8 +1312,9 @@ class Mailjet extends Module
 
 			return true;
 		}
-		else
-			$this->errors_list[] = $this->l('Api key or Secret key incorrect, please review it.');
+		else{
+            $this->errors_list[] = $this->l('Please verify that you have entered your API and secret key correctly. Please note this plug-in is compatible for Mailjet v3 accounts only.').'<a href="https://app.mailjet.com/support/why-do-i-get-an-api-error-when-trying-to-activate-a-mailjet-plug-in,497.htm" target="_blank" style="text-decoration:underline;">'.$this->l('Click here ').'</a>'.$this->l(' to check the version of your Mailjet account');
+        }
 
 		return false;
 	}
