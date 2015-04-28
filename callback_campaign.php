@@ -90,14 +90,10 @@ if ($data->next_step_url)
 				if (preg_match('`tokp`iUs', $l))
 					$link_without_token = preg_replace('`(\?tokp=.+$)`iUs', '', $link_without_token);
 
-
 				if (!preg_match('`\?`iUs', $liens[2][$key]))
 					$link_with_token = $link_without_token.'?tokp='.$res_campaign['token_presta'];
 				else
 					$link_with_token = $link_without_token.'&tokp='.$res_campaign['token_presta'];
-
-
-
 
 				$html = str_replace($link_without_token, $link_with_token, $html);
 			}
