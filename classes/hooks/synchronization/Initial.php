@@ -37,7 +37,7 @@ class HooksSynchronizationInitial extends HooksSynchronizationSynchronizationAbs
      */
     public function synchronize()
     {
-        if ($masterListId = $this->_getAlreadyCteatedMasterListId())
+        if ($masterListId = $this->_getAlreadyCreatedMasterListId())
         {
             $segmentSynch = new HooksSynchronizationSegment($this->_getApiOverlay());
             $segmentSynch->deleteList($masterListId);
@@ -60,14 +60,21 @@ class HooksSynchronizationInitial extends HooksSynchronizationSynchronizationAbs
         if (!is_numeric($newlyCreatedListId)) {
             throw new HooksSynchronizationException('The API response is not correct.');
         }
-
+        // increase the memory limit because the database could contain too many customers
+        ini_set('memory_limit', '1028M');
         $allUsers = $this->_getAllActiveCustomers();
 
         if (count($allUsers) === 0) {
             throw new HooksSynchronizationException('You don\'t have any users in the database.');
         }
-
+ 
         $segmentationObject = new Segmentation();
+        
+        $contstToAddCsv = array();
+        foreach ($allUsers as $userInfo) {
+            $contstToAddCsv[] = array($userInfo['email'], $userInfo['firstname'], $userInfo['lastname']);
+        }
+       
         /*
         * Sets related contact meta data like firstname, lastname, etc...
         */
@@ -76,11 +83,19 @@ class HooksSynchronizationInitial extends HooksSynchronizationSynchronizationAbs
             array('Datatype' => 'str', 'Name' => $segmentationObject->ll(49), 'NameSpace' => 'static')
         ));
 
-        $csvStr = '"'.implode('","',array('email',$segmentationObject->ll(48),$segmentationObject->ll(49)))."\"\n";
-        foreach ($allUsers as $contact) {
-            $csvStr .= '"'.implode('","',array($contact['email'],$contact['firstname'],$contact['lastname']))."\"\n";
+        $file = new SplFileObject('contacts.csv', 'w');
+        $headers = array("email","firstname","lastname");
+        $file->fputcsv($headers);
+        foreach ($contstToAddCsv as $contact) {
+        
+            $file->fputcsv($contact);
         }
-        $apiResponse = $apiOverlay->createContacts($csvStr, $newlyCreatedListId);
+ 
+        $contstToAddCsvString = file_get_contents('contacts.csv');
+        $file = null;
+        unlink('contacts.csv');
+
+        $apiResponse = $apiOverlay->createContacts($contstToAddCsvString, $newlyCreatedListId);
 
         if (!isset($apiResponse->ID)) {
             $segmentSynch = new HooksSynchronizationSegment($this->_getApiOverlay());
@@ -107,6 +122,7 @@ class HooksSynchronizationInitial extends HooksSynchronizationSynchronizationAbs
 			SELECT * 
 			FROM '._DB_PREFIX_.'customer 
 			WHERE active = 1 
+			AND newsletter = 1 
 			AND deleted = 0
 		');
     }
