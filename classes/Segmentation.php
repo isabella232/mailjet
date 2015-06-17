@@ -46,44 +46,14 @@ class Segmentation
 	{
 		$this->name = 'segmentation';
 		$this->tab = 'administration';
-		$this->version = '2.8';
-		$this->module_key = '986fb62d4efe6fb00788ecaefce96a1f';
-		$this->local_path = _PS_MODULE_DIR_.'mailjet';
-
-        $this->_addIncludes();
+		$this->_path = _PS_MODULE_DIR_.'mailjet';
         
-		$this->initCompatibility();
-
 		$this->displayName = $this->l('Segment Module');
 		$this->description = $this->l('Module for Customer Segmentation');
 		$this->page = 10;
 	}
  
-    private function _addIncludes()
-    {
-        Context::getContext()->controller->addCss($this->local_path.'/css/style.css');
-        Context::getContext()->controller->addCss($this->local_path.'/css/bundlejs_prestashop.css');
-        Context::getContext()->controller->addCss($this->local_path.'/css/bo.css');
-        
-        Context::getContext()->controller->addJs($this->local_path.'/js/functions.js');
-        Context::getContext()->controller->addJs($this->local_path.'/js/main.js');             
-        Context::getContext()->controller->addJs($this->local_path.'/js/bundlejs_prestashop.js');             
-
-    }
     
-	public function initCompatibility()
-	{
-		if (strpos(_PS_MODULE_DIR_.'mailjet', $this->name) === false)
-			return $this;
-
-		if (!class_exists('Context'))
-			require_once(_PS_MODULE_DIR_.'mailjet/libraries/compatibility/Context.php');
-
-		$this->initLang();
-
-		return $this;
-	}
-
 	public function initContent()
 	{
 		Configuration::updateValue('SEGMENT_CUSTOMER_TOKEN', Tools::getValue('token'));
@@ -926,7 +896,7 @@ class Segmentation
 			LOWER(c.email) AS "'.$this->ll(75).'", ad.phone AS "'.$this->ll(73).'",
 			ad.phone_mobile AS "'.$this->ll(74).'"'.$speField.' '.($label != '' ? ', '.$label : ' ').'
 			FROM '.$from.' '.$join.'
-			WHERE c.newsletter=1 AND c.deleted = 0 AND (ad.active = 1 OR ad.active IS NULL)
+			WHERE c.deleted = 0 AND (ad.active = 1 OR ad.active IS NULL)
 			AND (ad.deleted = 0 OR ad.deleted IS NULL)'.$field;
 
 		/*if ($post['date_start'] > 0 && $post['date_end'] > 0)
@@ -949,7 +919,15 @@ class Segmentation
 
 	// MySQL DB date format
 	private function _formatDate($date){
-		return date('Y-m-d',strtotime($date));
+        if(empty($date)) {
+            return '';
+            
+        }
+        if (@DateTime::createFromFormat('Y-m-d', $date) !== FALSE) {
+            // it's a date
+            return date('Y-m-d',strtotime($date));
+        } else return $date;
+		
 	}
 
 	public function getSubCategories($id_category)
@@ -1037,12 +1015,13 @@ class Segmentation
 		}
 		$nb = count($post['fieldSelect']);
 
-		for ($i = 0; $i < $nb; $i++)
+		for ($i = 0; $i < $nb; $i++) {
 			Db::getInstance()->Execute('INSERT INTO `'._DB_PREFIX_.'mj_condition`(`id_filter`, `id_basecondition`, `id_sourcecondition`, `id_fieldcondition`, `rule_a`, `rule_action`, `data`, `value1`, `value2`)
 					VALUES ('.(int)$id_filter.', '.pSQL($post['baseSelect'][$i]).', '.pSQL($post['sourceSelect'][$i]).', '.
                 pSQL($post['fieldSelect'][$i]).', "'.pSQL($post['rule_a'][$i]).'", "'.pSQL($post['rule_action'][$i]).'", "'.
                 pSQL($post['data'][$i]).'", "'.$this->_formatDate(pSQL($post['value1'][$i])).'", "'.
                 $this->_formatDate(pSQL($post['value2'][$i])).'")');
+        }
 
 		if ($auto_assign)
 		{
@@ -1222,12 +1201,12 @@ class Segmentation
 		if (!$id_lang)
 			$id_lang = $this->getCurrentIdLang();
 
-		if (file_exists($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'))
-			$this->trad = Tools::jsonDecode(Tools::file_get_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'));
+		if (file_exists($this->_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'))
+			$this->trad = Tools::jsonDecode(Tools::file_get_contents($this->_path.'/translations/translation_cache_'.(int)$id_lang.'.txt'));
 		else
 		{
 			$this->cacheLang();
-			$tmp_create = $this->local_path.'/translations/translation_create_'.(int)$id_lang.'.txt';
+			$tmp_create = $this->_path.'/translations/translation_create_'.(int)$id_lang.'.txt';
 			if (file_exists($tmp_create))
 			{
 				$fp = fopen($tmp_create, 'r');
@@ -1244,7 +1223,7 @@ class Segmentation
 					fwrite($fp, $trad."\r\n");
 				fclose($fp);
 			}
-			file_put_contents($this->local_path.'/translations/translation_cache_'.(int)$id_lang.'.txt', Tools::jsonEncode($this->trad));
+			file_put_contents($this->_path.'/translations/translation_cache_'.(int)$id_lang.'.txt', Tools::jsonEncode($this->trad));
 		}
 	}
 
@@ -1264,8 +1243,8 @@ class Segmentation
 	{
 		$langs = Language::getLanguages();
 		foreach ($langs as $lang)
-			if (file_exists($this->local_path.'/translations/translation_cache_'.$lang['id_lang'].'.txt'))
-				unlink($this->local_path.'/translations/translation_cache_'.$lang['id_lang'].'.txt');
+			if (file_exists($this->_path.'/translations/translation_cache_'.$lang['id_lang'].'.txt'))
+				unlink($this->_path.'/translations/translation_cache_'.$lang['id_lang'].'.txt');
 	}
 	public function cacheLang()
 	{
