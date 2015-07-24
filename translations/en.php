@@ -190,7 +190,7 @@ $_MODULE['<{mailjet}prestashop>connect_step_0_71d284a580c79e103da584922b49ff4d']
 $_MODULE['<{mailjet}prestashop>connect_step_0_0c39aa058ec1fb88c4c4a1aacc96fb3c'] = 'Please enter your Mailjet login information below';
 $_MODULE['<{mailjet}prestashop>connect_step_0_a7c87ac45effd6bfbdafef12374c489b'] = 'Compte Mailjet';
 $_MODULE['<{mailjet}prestashop>connect_step_0_4aabbc3d7b7dbef68508d5e6a2247a74'] = 'Save & Login';
-$_MODULE['<{mailjet}prestashop>connect_step_0_6110e3692a789bcff0870b04b13a06bb'] = 'Retour à l\'accueil';
+$_MODULE['<{mailjet}prestashop>connect_step_0_6110e3692a789bcff0870b04b13a06bb'] = 'Back';
 $_MODULE['<{mailjet}prestashop>events_ff4e350e168073bf804c419f3801cb91'] = 'The elements have been updated and saved';
 $_MODULE['<{mailjet}prestashop>events_724ec9c8788825fc3f8c9923d6e3ff10'] = 'Oops.  It seems we were not able to save some elements';
 $_MODULE['<{mailjet}prestashop>events_1f8f72e5a5293e775079c9b848494b1f'] = 'To activate Events, you must go to your Mailjet account ';
