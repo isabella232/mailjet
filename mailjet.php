@@ -121,7 +121,7 @@ class Mailjet extends Module
 		$this->displayName = 'Mailjet';
 		$this->description = $this->l('Create contact lists and client segment groups, drag-n-drop newsletters, define client re-engagement triggers, follow and analyze all email user interaction, minimize negative user engagement events (blocked, unsubs and spam) and optimise deliverability and revenue generation. Get started today with 6000 free emails per month.');
 		$this->author = 'PrestaShop';
-		$this->version = '3.2.0';
+		$this->version = '3.2.3';
 		$this->module_key = '59cce32ad9a4b86c46e41ac95f298076';
 		$this->tab = 'advertising_marketing';
 
@@ -224,7 +224,7 @@ class Mailjet extends Module
 
 	public function uninstall()
 	{
-		$fileTranslationCache = $this->local_path.'/translations/translation_cache.txt';
+		$fileTranslationCache = $this->_path.'/translations/translation_cache.txt';
 		if (file_exists($fileTranslationCache))
 			unlink($fileTranslationCache);
 
@@ -303,12 +303,17 @@ class Mailjet extends Module
 			$smarty_page['MJ_'.$name] = $name;
 			$nobug = $value;
 		}
-
-        $this->context->controller->addCSS($this->local_path.'/css/bo.css');
-        $this->context->controller->addJs($this->local_path.'/js/jquery.timer.js');             
-        $this->context->controller->addJs($this->local_path.'/js/bo.js');             
-        $this->context->controller->addJs($this->local_path.'/js/events.js');    
         
+        $this->context->controller->addCss($this->_path.'/css/style.css');
+        $this->context->controller->addCSS($this->_path.'/css/bo.css');
+        $this->context->controller->addCSS($this->_path.'/css/bundlejs_prestashop.css');
+        $this->context->controller->addJs($this->_path.'/js/jquery.timer.js');
+        $this->context->controller->addJs($this->_path.'/js/bo.js');
+        $this->context->controller->addJs($this->_path.'/js/events.js');
+        $this->context->controller->addJs($this->_path.'/js/functions.js');
+        $this->context->controller->addJs($this->_path.'/js/main.js');
+        $this->context->controller->addJs($this->_path.'/js/bundlejs_prestashop.js');
+
 		$this->context->smarty->assign(
 				array(
 						'MJ_base_dir' => $this->module_access['uri'],
@@ -866,13 +871,55 @@ class Mailjet extends Module
 	{
 		Configuration::updateValue('PS_MAIL_SERVER', $this->mj_mail_server);
 		Configuration::updateValue('PS_MAIL_SMTP_PORT', $this->mj_mail_port);
-		Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'tls');
+		//Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'tls');
 		Configuration::updateValue('PS_MAIL_USER', $this->account->API_KEY);
 		Configuration::updateValue('PS_MAIL_PASSWD', $this->account->SECRET_KEY);
 		Configuration::updateValue('PS_MAIL_METHOD', 2);
 		Configuration::updateValue('MJ_ALLEMAILS', 1);
+        
+        $account = Tools::jsonDecode(Configuration::get('MAILJET'), true);
+        Configuration::updateValue('PS_SHOP_EMAIL', $account['EMAIL']);
+        self::setSMTPconnectionParams();
 	}
+    
+    public static function setSMTPconnectionParams()
+	{
+        
+        $configs = array(array('ssl://', 465),
+                              array('tls://', 587),
+                              array('', 587),
+                              array('', 588),
+                              array('tls://', 25),
+                              array('', 25));
 
+        $host = Configuration::get('PS_MAIL_SERVER');
+        
+        $connected = FALSE;
+
+        for ($i = 0; $i < count($configs); ++$i) {
+
+            $soc = @fSockOpen($configs [$i] [0].$host, $configs [$i] [1], $errno, $errstr, 5);
+
+            if ($soc) {
+                fClose ($soc);
+                $connected = TRUE;
+                break;
+            }
+        }
+
+        if ($connected) {
+            if ('ssl://' == $configs [$i] [0]) {
+                Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'ssl');
+            } elseif ('tls://' == $configs [$i] [0]) {
+                Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'tls');
+            }  else {
+                Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', '');
+            }
+            Configuration::updateValue('PS_MAIL_SMTP_PORT', $configs[$i][1]);
+        }
+    }
+    
+    
 	public function getContent()
 	{
 		if ($this->account->MASTER_LIST_SYNCHRONIZED == 0)
@@ -887,7 +934,11 @@ class Mailjet extends Module
 		switch ($this->page_name)
 		{
 			case 'SETUP_LANDING':
-				$this->context->smarty->assign(array('is_landing' => true));
+				$mt = new MailjetTemplate();
+				$this->context->smarty->assign(array(
+					'is_landing' => true,
+					'lang' => $mt->getLang()
+				));
 				$this->mj_template->fetchTemplate('setup_landing_message');
 				$this->mj_template->fetchTemplate('setup_landing_bt_more');
 				$this->mj_template->fetchTemplate('setup_landing_bt_activate');
@@ -1138,7 +1189,8 @@ class Mailjet extends Module
 		$languages = Language::getLanguages();
 		$sel_lang = $this->context->language->id;
         $cron = Tools::getShopDomainSsl(true)._MODULE_DIR_.$this->name.'/mailjet.cron.php?token='.
-            Configuration::get('SEGMENT_CUSTOMER_TOKEN');
+            (Configuration::get('SEGMENT_CUSTOMER_TOKEN')
+                ? Configuration::get('SEGMENT_CUSTOMER_TOKEN') : Tools::getValue('token'));
 		$iso = $this->context->language->iso_code;
 
 		// Assign
@@ -1333,11 +1385,15 @@ class Mailjet extends Module
 
 			Configuration::updateValue('PS_MAIL_SERVER', $this->mj_mail_server);
 			Configuration::updateValue('PS_MAIL_SMTP_PORT', $this->mj_mail_port);
-			Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'tls');
+			//Configuration::updateValue('PS_MAIL_SMTP_ENCRYPTION', 'tls');
 			Configuration::updateValue('PS_MAIL_USER', $apiKey);
 			Configuration::updateValue('PS_MAIL_PASSWD', $secretKey);
 			Configuration::updateValue('PS_MAIL_METHOD', 2);
-
+ 
+            $account = Tools::jsonDecode(Configuration::get('MAILJET'), true);
+            Configuration::updateValue('PS_SHOP_EMAIL', $result->Email);
+            self::setSMTPconnectionParams();
+            
 			if ($this->account->MASTER_LIST_SYNCHRONIZED == 0)
 				return $this->initalSynchronize();
 
@@ -1517,19 +1573,30 @@ class Mailjet extends Module
 	{
 		try
 		{
-			$account = Tools::jsonDecode(Configuration::get('MAILJET'));
-			$from = $account['EMAIL'];
+			$account = Tools::jsonDecode(Configuration::get('MAILJET'), true);
+            $from = $account['EMAIL'];
 			$from_name = Configuration::get('PS_SHOP_NAME');
 
-			$connection = new Swift_Connection_SMTP(
-					self::mj_mail_server(),
-					self::mj_mail_port(),
-					Swift_Connection_SMTP::ENC_TLS
+            $mj_mail_server_port = Configuration::get('PS_MAIL_SMTP_PORT');
+            switch (Configuration::get('PS_MAIL_SMTP_ENCRYPTION')) :
+                case 'tls':
+                    $mj_mail_server_encryption = Swift_Connection_SMTP::ENC_TLS;
+                    break;
+                case 'ssl':
+                    $mj_mail_server_encryption = Swift_Connection_SMTP::ENC_SSL;
+                    break;
+                default:
+                    $mj_mail_server_encryption = Swift_Connection_SMTP::ENC_OFF;
+                    break;
+            endswitch;
+            $connection = new Swift_Connection_SMTP(
+					Configuration::get('PS_MAIL_SERVER'),
+					$mj_mail_server_port,
+                    $mj_mail_server_encryption
 			);
-			$takeinfo = new Mailjet();
-			$connection->setUsername($takeinfo->account['API_KEY']);
-			$connection->setPassword($takeinfo->account['SECRET_KEY']);
-
+			$connection->setUsername($account['API_KEY']);
+			$connection->setPassword($account['SECRET_KEY']);
+ 
 			$swift = new Swift($connection);
 
 			$sMessage = new Swift_Message('['.$from_name.'] '.$subject);
@@ -1544,6 +1611,8 @@ class Mailjet extends Module
 			return $send;
 		}
 		catch (Swift_Exception $e) {
+            			
+
 			return false;
 		}
 	}

@@ -83,18 +83,13 @@ class HooksSynchronizationInitial extends HooksSynchronizationSynchronizationAbs
             array('Datatype' => 'str', 'Name' => $segmentationObject->ll(49), 'NameSpace' => 'static')
         ));
 
-        $file = new SplFileObject('contacts.csv', 'w');
         $headers = array("email","firstname","lastname");
-        $file->fputcsv($headers);
+        $contstToAddCsvString = '';
+        $contstToAddCsvString .= implode(",", $headers) ."\n";
         foreach ($contstToAddCsv as $contact) {
+            $contstToAddCsvString .= implode(",", $contact) ."\n";
+        } 
         
-            $file->fputcsv($contact);
-        }
- 
-        $contstToAddCsvString = file_get_contents('contacts.csv');
-        $file = null;
-        unlink('contacts.csv');
-
         $apiResponse = $apiOverlay->createContacts($contstToAddCsvString, $newlyCreatedListId);
 
         if (!isset($apiResponse->ID)) {
