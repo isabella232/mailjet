@@ -24,6 +24,7 @@
 *}{* Has to be initiated here cause it's defined after the postProcess *}
 <script type="text/javascript">
 	var MJ_page_name = "{$MJ_page_name|escape|default:''}";
+	var datePickerJsFormat = "{$mj_datePickerJsFormat|escape:'javascript'|default:'yy-mm-dd'}";
 </script>
 
 {if !$is_landing}
@@ -68,8 +69,7 @@
     <div class="mj_landing">
         <div align="center">
             <br />
-            <a href="https://www.mailjet.com/support"
-               target="_blank">{l s='If you have a question or if you have a problem, click here to contact support.' mod='mailjet'}</a>
+            {{l s='If you have a question or if you have a problem, click here to contact support.' mod='mailjet'}|html_entity_decode}
         </div>
     </div>
 {/if}
