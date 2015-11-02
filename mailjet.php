@@ -121,13 +121,12 @@ class Mailjet extends Module
 		$this->displayName = 'Mailjet';
 		$this->description = $this->l('Create contact lists and client segment groups, drag-n-drop newsletters, define client re-engagement triggers, follow and analyze all email user interaction, minimize negative user engagement events (blocked, unsubs and spam) and optimise deliverability and revenue generation. Get started today with 6000 free emails per month.');
 		$this->author = 'PrestaShop';
-		$this->version = '3.2.5';
+		$this->version = '3.2.11';
 		$this->module_key = '59cce32ad9a4b86c46e41ac95f298076';
 		$this->tab = 'advertising_marketing';
 
 		// Parent constructor
 		parent::__construct();
-
 		// Backward compatibility
 		if (version_compare(_PS_VERSION_, '1.5', '<'))
 			require(_PS_MODULE_DIR_.$this->name.'/backward_compatibility/backward.php');
@@ -173,7 +172,8 @@ class Mailjet extends Module
 	public function install()
 	{
 		//$this->account = array(); // **
-		$this->account->TOKEN = md5(rand());
+        $this->account = ($account = Tools::jsonDecode(Configuration::get('MAILJET'))) ? $account : $this->account;
+		$this->account->TOKEN = Tools::getValue('token');
 		$this->updateAccountSettings();
 		/* $segmentation = new Segmentation(); */
 
@@ -198,19 +198,18 @@ class Mailjet extends Module
 		$this->createTriggers();
 		Configuration::updateValue('MJ_ALLEMAILS', 1);
 
-			$this->registerHook('actionAdminCustomersControllerSaveBefore');
-			$this->registerHook('actionAdminCustomersControllerSaveAfter');
-			$this->registerHook('actionAdminCustomersControllerStatusAfter');
-			$this->registerHook('actionAdminCustomersControllerDeleteBefore');
-
 		return (parent::install()
 			&& $this->loadConfiguration()
-			&& $this->registerHook('BackOfficeHeader')
+            && $this->registerHook('actionAdminCustomersControllerSaveBefore')
+			&& $this->registerHook('actionAdminCustomersControllerSaveAfter')
+			&& $this->registerHook('actionAdminCustomersControllerStatusAfter')
+			&& $this->registerHook('actionAdminCustomersControllerDeleteBefore')
+			&& $this->registerHook('actionObjectCustomerUpdateAfter')
+            && $this->registerHook('BackOfficeHeader')
 			&& $this->registerHook('adminCustomers')
 			&& $this->registerHook('header')
 			&& $this->registerHook('newOrder')
 			&& $this->registerHook('createAccount')
-			/* && $this->registerHook('newOrder') // SEGMENTATION ** ** */
 			&& $this->registerHook('updateQuantity')
 			&& $this->registerHook('cart')
 			&& $this->registerHook('authentication')
@@ -262,8 +261,13 @@ class Mailjet extends Module
 
 	public function hookNewOrder($params)
 	{
+        if(empty($params['customer']->id)){
+            return '';
+        }
 		$this->checkAutoAssignment((int)$params['customer']->id);
-
+        if(empty($params['order']->id_cart)){
+            return '';
+        }
 		$sql = 'SELECT * FROM `'._DB_PREFIX_.'mj_roi_cart`
 				WHERE id_cart = '.(int)$params['order']->id_cart;
 
@@ -307,6 +311,7 @@ class Mailjet extends Module
         $this->context->controller->addCss($this->_path.'/css/style.css');
         $this->context->controller->addCSS($this->_path.'/css/bo.css');
         $this->context->controller->addCSS($this->_path.'/css/bundlejs_prestashop.css');
+		$this->context->controller->addJquery();
         $this->context->controller->addJs($this->_path.'/js/jquery.timer.js');
         $this->context->controller->addJs($this->_path.'/js/bo.js');
         $this->context->controller->addJs($this->_path.'/js/events.js');
@@ -361,7 +366,6 @@ class Mailjet extends Module
 	public function hookActionAdminCustomersControllerSaveAfter($params)
 	{
 		$customer = $params['return'];
-
 		$initialSynchronization = new HooksSynchronizationSingleUser( MailjetTemplate::getApi() );
 
 		$newEmail = $customer->email;
@@ -369,27 +373,57 @@ class Mailjet extends Module
 
 		$changedMail = false;
 
-		if ($newEmail != $oldEmail)
-			$changedMail = true;
+		if ($newEmail != $oldEmail) {
+            $changedMail = true;
+        }
 
 		try {
-			if ($changedMail)
-			{
-				$initialSynchronization->subscribe($newEmail);
+			if ($changedMail) {
+                if($customer->active == 1 && $customer->newsletter == 1) {
+                    $initialSynchronization->subscribe($newEmail);
+                }
 				$initialSynchronization->remove($oldEmail);
 			}
 
 			$this->checkAutoAssignment($customer->id);
 
-			if ($customer->active == 0)
-				$initialSynchronization->unsubscribe($newEmail);
-			else
-				$initialSynchronization->subscribe($newEmail);
+			if ($customer->active == 0 || $customer->newsletter == 0) {
+                $initialSynchronization->unsubscribe($newEmail);
+            } elseif($customer->active == 1 && $customer->newsletter == 1) {
+                $initialSynchronization->subscribe($newEmail);
+            }
 
 		} catch (Exception $e) {
 			$this->errors_list[] = $this->l($e->getMessage());
 		}
 	}
+
+
+    /**
+     * Hook which is triggered right after customer account is changed - either by the customer himself via Frontend
+     * or by admin via Customers listing - click on 'Newsletter' checkbox in the listing
+     * (note that the Hook for customer profile edition by Admin is different - it is hookActionAdminCustomersControllerSaveAfter)
+     * @param type $params
+     */
+    public function hookActionObjectCustomerUpdateAfter($params)
+	{
+		$customer = $params['object'];
+		$initialSynchronization = new HooksSynchronizationSingleUser( MailjetTemplate::getApi() );
+
+        try {
+			$this->checkAutoAssignment($customer->id);
+
+            if ($customer->active == 0 || $customer->newsletter == 0) {
+                $initialSynchronization->unsubscribe($customer->email);
+            } elseif($customer->active == 1 && $customer->newsletter == 1) {
+                $initialSynchronization->subscribe($customer->email);
+            }
+
+		} catch (Exception $e) {
+			$this->errors_list[] = $this->l($e->getMessage());
+		}
+	}
+
 
 	/**
 	 *
@@ -407,10 +441,11 @@ class Mailjet extends Module
 		try {
 			$this->checkAutoAssignment($customer->id);
 
-			if ($customer->active == 0)
-				$initialSynchronization->unsubscribe($customer->email);
-			else
-				$initialSynchronization->subscribe($customer->email);
+            if ($customer->active == 0 || $customer->newsletter == 0) {
+                $initialSynchronization->unsubscribe($customer->email);
+            } elseif($customer->active == 1 && $customer->newsletter == 1) {
+                $initialSynchronization->subscribe($customer->email);
+            }
 
 		} catch (Exception $e) {
 			$this->errors_list[] = $this->l($e->getMessage());
@@ -481,7 +516,10 @@ class Mailjet extends Module
 		);
 
 		try {
-			$initialSynchronization->subscribe($params['newCustomer']->email);
+
+            if($params['newCustomer']->active == 1 && $params['newCustomer']->newsletter == 1) {
+                $initialSynchronization->subscribe($params['newCustomer']->email);
+            }
 			$this->checkAutoAssignment($params['newCustomer']->id);
 		} catch (Exception $e) {
 			$this->errors_list[] = $this->l($e->getMessage());
@@ -500,7 +538,9 @@ class Mailjet extends Module
 		$initialSynchronization = new HooksSynchronizationSingleUser( MailjetTemplate::getApi() );
 
 		try {
-			$initialSynchronization->subscribe($params['newCustomer']->email);
+            if($params['newCustomer']->active == 1 && $params['newCustomer']->newsletter == 1) {
+                $initialSynchronization->subscribe($params['newCustomer']->email);
+            }
 		} catch (Exception $e) {
 			$this->errors_list[] = $this->l($e->getMessage());
 			return false;
@@ -651,10 +691,13 @@ class Mailjet extends Module
 			);
 			$mailjetListID = $obj->_getMailjetContactListId($filterId);
 
-			if ($result)
-				$initialSynchronization->subscribe($customer->email, $mailjetListID);
-			else
-				$initialSynchronization->remove($customer->email, $mailjetListID);
+			if ($result) {
+                if($customer->active == 1 && $customer->newsletter == 1) {
+                    $initialSynchronization->subscribe($customer->email, $mailjetListID);
+                }
+            } else {
+                $initialSynchronization->remove($customer->email, $mailjetListID);
+            }
 		}
 
 		return $this;
@@ -701,7 +744,9 @@ class Mailjet extends Module
 			&& Db::getInstance()->Execute('INSERT INTO `'._DB_PREFIX_."mj_sourcecondition` VALUES
 				(1, 1, 1, 'LEFT JOIN `%1orders` o ON c.`id_customer` = o.`id_customer`\r\nLEFT JOIN `%1order_detail` od ON o.`id_order` = od.`id_order`\r\nLEFT JOIN `%1currency` cu ON cu.`id_currency` = o.`id_currency`'),
 				(2, 1, 0, 'LEFT JOIN `%1address` ad ON c.`id_customer` = ad.`id_customer` '),
-				(3, 1, 90, NULL)");
+				(3, 1, 90, NULL),
+				(4, 1, 107, 'LEFT JOIN `%1shop` s ON s.`id_shop` = c.`id_shop`')
+			");
 	}
 
 	public function fetchTemplate($path, $name)
@@ -823,9 +868,21 @@ class Mailjet extends Module
 					$this->triggers['trigger'][$sel]['discountType'] = (int)Tools::getValue('MJ_triggers_trigger_'.$sel.'_discountType');
 				}
 				$languages = Language::getLanguages();
+                $shop_name = $this->context->shop->name;
+        		$shop_url = 'http://'.$this->context->shop->domain;
+                $shop_logo = $shop_url._PS_IMG_.Configuration::get('PS_LOGO').'?'.Configuration::get('PS_IMG_UPDATE_TIME');
+
 				foreach ($languages as $l) {
 					$this->triggers['trigger'][$sel]['subject'][$l['id_lang']] = Tools::getValue('MJ_triggers_trigger_'.$sel.'_subject_'.$l['id_lang']);
 					$this->triggers['trigger'][$sel]['mail'][$l['id_lang']] = Tools::getValue('MJ_triggers_trigger_'.$sel.'_mail_'.$l['id_lang']);
+
+                    // replace {shop_name}, {shop_url}, {shop_logo}
+                    $this->triggers['trigger'][$sel]['subject'][$l['id_lang']] = str_replace('{shop_name}', $shop_name, $this->triggers['trigger'][$sel]['subject'][$l['id_lang']]);
+                    $this->triggers['trigger'][$sel]['subject'][$l['id_lang']] = str_replace('{shop_url}', $shop_url, $this->triggers['trigger'][$sel]['subject'][$l['id_lang']]);
+                    $this->triggers['trigger'][$sel]['subject'][$l['id_lang']] = str_replace('{shop_logo}', $shop_logo, $this->triggers['trigger'][$sel]['subject'][$l['id_lang']]);
+                    $this->triggers['trigger'][$sel]['mail'][$l['id_lang']] = str_replace('{shop_name}', $shop_name, $this->triggers['trigger'][$sel]['mail'][$l['id_lang']]);
+                    $this->triggers['trigger'][$sel]['mail'][$l['id_lang']] = str_replace('{shop_url}', $shop_url, $this->triggers['trigger'][$sel]['mail'][$l['id_lang']]);
+                    $this->triggers['trigger'][$sel]['mail'][$l['id_lang']] = str_replace('{shop_logo}', $shop_logo, $this->triggers['trigger'][$sel]['mail'][$l['id_lang']]);
 				}
 			}
 			$this->updateTriggers();
@@ -1532,7 +1589,7 @@ class Mailjet extends Module
 	 */
 	public function check_subscription()
 	{
-		$this->account['ACTIVATION'] = 1;
+		$this->account->ACTIVATION = 1;
 		$this->updateAccountSettings();
 	}
 
@@ -1553,7 +1610,7 @@ class Mailjet extends Module
 	 */
 	public function getToken()
 	{
-		return $this->account['TOKEN'];
+        return $this->account->TOKEN;
 	}
 
 	public function getAdminFullUrl()

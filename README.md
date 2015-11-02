@@ -68,6 +68,28 @@ Happy emailing!
 
 ## Changelog
 
+= 3.2.11 =
+* Fix related with trigger emails
+
+= 3.2.10 =
+* Segmentation fix related with Group association
+
+= 3.2.9 =
+* Fixed displaying of special symbols in trigger emails
+* Added checks for existing parameters in hookNewOrder()
+
+= 3.2.8 =
+* jQuery is included explicitly now in the module
+* Added correct hooks, related to customer edition and properly handling of customer subscription/unsubscription to Mailjet's master contact list
+
+= 3.2.7 =
+* Mailjet’s segmentation feature now allows multi-store owners to filter their customers by the store they belong to.
+
+= 3.2.6 =
+* Added links to User guide and Support at the plugin footer
+* Fixed marketing triggers cron script
+* On creation of a new customer, the email and properties are now synced properly to Mailjet.
+
 = 3.2.5 =
 * Added explanation video to the plugin setup page. 
 * Updated Mailjet logo with one with higher quality. 
