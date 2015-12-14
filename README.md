@@ -68,6 +68,13 @@ Happy emailing!
 
 ## Changelog
 
+= 3.2.13 =
+* Fix on "Cateroy name" filter in Prestashop segmentation
+* ES translation fixes
+
+= 3.2.12 =
+* ES translations
+
 = 3.2.11 =
 * Fix related with trigger emails
 
